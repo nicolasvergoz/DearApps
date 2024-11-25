@@ -6,7 +6,7 @@ class MockURLProtocol: URLProtocol {
     case invalidURL
   }
   
-  nonisolated(unsafe) static var mockURLs: [String : (error: Error?, data: Data?, response: URLResponse?)] = [:]
+  nonisolated(unsafe) static var mockURLs: [String : (error: Error?, data: Data?, response: URLResponse?)] = [String : (error: Error?, data: Data?, response: URLResponse?)]()
   
   override class func canInit(with request: URLRequest) -> Bool {
     return true
@@ -19,7 +19,7 @@ class MockURLProtocol: URLProtocol {
   override func startLoading() {
     guard let url = request.url else { return }
     
-    if let (error, data, response) = URLProtocolMock.mockURLs[url.absoluteString] {
+    if let (error, data, response) = MockURLProtocol.mockURLs[url.absoluteString] {
       if let response: URLResponse = response {
         self.client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
       }

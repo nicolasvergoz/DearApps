@@ -13,16 +13,21 @@ public final class DearAppAPI {
 
   /// Get App Informations by bundleId
   public func getApp(bundleId: String) async throws -> ApplicationDTO {
-    var url: URL = baseURL.appendingPathComponent("lookup")
+    var url: URL = baseURL
     let language = locale.language.languageCode?.identifier.lowercased() ?? "en"
     if language != "en" { url.appendPathComponent(language) }
-    url.appending(queryItems: [
+    url = url.appendingPathComponent("lookup")
+    url.append(queryItems: [
       URLQueryItem(name: "bundleId", value: bundleId)
     ])
-    let request = URLRequest(url: url)
     let result: SearchResponseDTO = try await performRequest(method: .get, url: url)
     guard result.resultCount > 0 else { throw DearAppError.noResults }
-    let apps: [ApplicationDTO] = result.results.compactMap { $0 as? ApplicationDTO }
+    let apps: [ApplicationDTO] = result.results.compactMap {
+      switch $0 {
+      case .application(let app): app
+      case .developer(_): nil
+      }
+    }
     guard let app = apps.first(where: { $0.wrapperType == .software }) else {
       throw DearAppError.appNotFound
     }
@@ -31,36 +36,25 @@ public final class DearAppAPI {
 
   /// Get App Informations by AppStore Id
   public func getApp(appStoreId: Int) async throws -> ApplicationDTO {
-    var url: URL = baseURL.appendingPathComponent("lookup")
+    var url: URL = baseURL
     let language = locale.language.languageCode?.identifier.lowercased() ?? "en"
     if language != "en" { url.appendPathComponent(language) }
-    url.appending(queryItems: [
+    url = url.appendingPathComponent("lookup")
+    url.append(queryItems: [
       URLQueryItem(name: "id", value: "\(appStoreId)")
     ])
-    let request = URLRequest(url: url)
     let result: SearchResponseDTO = try await performRequest(method: .get, url: url)
     guard result.resultCount > 0 else { throw DearAppError.noResults }
-    let apps: [ApplicationDTO] = result.results.compactMap { $0 as? ApplicationDTO }
-    guard let app = apps.first(where: { $0.wrapperType == .software }) else {
+    let apps: [ApplicationDTO] = result.results.compactMap {
+      switch $0 {
+      case .application(let app): app
+      case .developer(_): nil
+      }
+    }
+    guard let app = apps.first else {
       throw DearAppError.appNotFound
     }
     return app
-  }
-
-  /// Get Developer's Apps
-  public func getApps(developerId: Int) async throws -> [ApplicationDTO] {
-    var url = baseURL.appendingPathComponent("lookup")
-    let language = locale.language.languageCode?.identifier.lowercased() ?? "en"
-    if language != "en" { url.appendPathComponent(language) }
-    url.appending(queryItems: [
-      URLQueryItem(name: "id", value: "\(developerId)"),
-      URLQueryItem(name: "entity", value: "software"),
-      
-    ])
-    let request = URLRequest(url: url)
-    let result: SearchResponseDTO = try await performRequest(method: .get, url: url)
-    guard result.resultCount > 0 else { throw DearAppError.noResults }
-    return result.results.compactMap { $0 as? ApplicationDTO }
   }
 
   /// Get Other Apps of from same Developer by current app's bundleId
@@ -70,30 +64,72 @@ public final class DearAppAPI {
   }
 
   /// Get Developer Informations
-  public func getDeveloper(appStoreId: Int) async throws -> DeveloperDTO {
-    var url = baseURL.appendingPathComponent("lookup")
-    url.appending(queryItems: [
-      URLQueryItem(name: "id", value: "\(appStoreId)")
+  public func getDeveloper(developerId: Int) async throws -> DeveloperDTO {
+    var url = baseURL
+    url.append(queryItems: [
+      URLQueryItem(name: "id", value: "\(developerId)")
     ])
-    let request = URLRequest(url: url)
+    url = url.appendingPathComponent("lookup")
     let result: SearchResponseDTO = try await performRequest(method: .get, url: url)
     guard result.resultCount > 0 else { throw DearAppError.noResults }
-    let developers: [DeveloperDTO] = result.results.compactMap { $0 as? DeveloperDTO }
+    let developers: [DeveloperDTO] = result.results.compactMap {
+      switch $0 {
+      case .application(_): nil
+      case .developer(let dev): dev
+      }
+    }
     guard let developer = developers.first else {
       throw DearAppError.developerNotFound
     }
     return developer
+  }
+  
+  /// Get Developer's Apps
+  public func getApps(developerId: Int) async throws -> [ApplicationDTO] {
+    var url = baseURL
+    let language = locale.language.languageCode?.identifier.lowercased() ?? "en"
+    if language != "en" { url.appendPathComponent(language) }
+    url = url.appendingPathComponent("lookup")
+    url.append(queryItems: [
+      URLQueryItem(name: "id", value: "\(developerId)"),
+      URLQueryItem(name: "entity", value: "software"),
+      
+    ])
+    let result: SearchResponseDTO = try await performRequest(method: .get, url: url)
+    guard result.resultCount > 0 else { throw DearAppError.noResults }
+    let apps: [ApplicationDTO] = result.results.compactMap {
+      switch $0 {
+      case .application(let app): app
+      case .developer(_): nil
+      }
+    }
+    return apps
   }
 
   /// Perform a request
   private func performRequest<T: Decodable>(method: HTTPMethod, url: URL) async throws -> T {
     var request = URLRequest(url: url)
     request.httpMethod = method.rawValue
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-    let (data, _) = try await URLSession.shared.data(for: request)
-    let decoder = JSONDecoder()
-    let decodedResponse = try decoder.decode(T.self, from: data)
-    return decodedResponse
+    do {
+        let (data, response) = try await urlSession.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw DearAppError.invalidResponse
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw DearAppError.httpError(statusCode: httpResponse.statusCode)
+        }
+
+        let decoder = JSONDecoder()
+        return try decoder.decode(T.self, from: data)
+    } catch let decodingError as DecodingError {
+        throw DearAppError.decodingError(decodingError)
+    } catch {
+        throw DearAppError.networkError(error)
+    }
   }
 }
 
@@ -109,4 +145,8 @@ enum DearAppError: Error {
   case appNotFound
   case developerNotFound
   case noResults
+  case invalidResponse
+  case httpError(statusCode: Int)
+  case decodingError(DecodingError)
+  case networkError(Error)
 }
