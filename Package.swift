@@ -5,7 +5,7 @@ let package = Package(
   name: "DearApps",
   platforms: [
     .macOS(.v13),
-    .iOS(.v14),
+    .iOS(.v16),
     .tvOS(.v16),
     .watchOS(.v9),
   ],
