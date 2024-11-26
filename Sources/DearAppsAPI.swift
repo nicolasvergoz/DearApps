@@ -1,6 +1,6 @@
 import Foundation
 
-public final class DearAppsAPI {
+public actor DearAppsAPI {
 
   private let urlSession: URLSession
   private let locale: Locale
