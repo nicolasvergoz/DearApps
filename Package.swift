@@ -2,17 +2,17 @@
 import PackageDescription
 
 let package = Package(
-  name: "DearApp",
+  name: "DearApps",
   platforms: [
     .macOS(.v13),
-    .iOS(.v16),
+    .iOS(.v14),
     .tvOS(.v16),
     .watchOS(.v9),
   ],
   products: [
     .library(
-      name: "DearApp",
-      targets: ["DearApp"]
+      name: "DearApps",
+      targets: ["DearApps"]
     )
   ],
   dependencies: [
@@ -20,12 +20,12 @@ let package = Package(
   ],
   targets: [
     .target(
-      name: "DearApp",
+      name: "DearApps",
       dependencies: []
     ),
     .testTarget(
-      name: "DearAppTests",
-      dependencies: ["DearApp"]
+      name: "DearAppsTests",
+      dependencies: ["DearApps"]
     ),
   ]
 )

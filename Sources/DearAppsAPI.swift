@@ -1,12 +1,12 @@
 import Foundation
 
-public final class DearAppAPI {
+public final class DearAppsAPI {
 
   private let urlSession: URLSession
   private let locale: Locale
   private let baseURL: URL = URL(string: "https://itunes.apple.com")!
 
-  init(urlSession: URLSession = .shared, locale: Locale = .current) {
+  public init(urlSession: URLSession = .shared, locale: Locale = .current) {
     self.urlSession = urlSession
     self.locale = locale
   }
@@ -21,7 +21,7 @@ public final class DearAppAPI {
       URLQueryItem(name: "bundleId", value: bundleId)
     ])
     let result: SearchResponseDTO = try await performRequest(method: .get, url: url)
-    guard result.resultCount > 0 else { throw DearAppError.noResults }
+    guard result.resultCount > 0 else { throw DearAppsError.noResults }
     let apps: [ApplicationDTO] = result.results.compactMap {
       switch $0 {
       case .application(let app): app
@@ -29,7 +29,7 @@ public final class DearAppAPI {
       }
     }
     guard let app = apps.first(where: { $0.wrapperType == .software }) else {
-      throw DearAppError.appNotFound
+      throw DearAppsError.appNotFound
     }
     return app
   }
@@ -44,7 +44,7 @@ public final class DearAppAPI {
       URLQueryItem(name: "id", value: "\(appStoreId)")
     ])
     let result: SearchResponseDTO = try await performRequest(method: .get, url: url)
-    guard result.resultCount > 0 else { throw DearAppError.noResults }
+    guard result.resultCount > 0 else { throw DearAppsError.noResults }
     let apps: [ApplicationDTO] = result.results.compactMap {
       switch $0 {
       case .application(let app): app
@@ -52,7 +52,7 @@ public final class DearAppAPI {
       }
     }
     guard let app = apps.first else {
-      throw DearAppError.appNotFound
+      throw DearAppsError.appNotFound
     }
     return app
   }
@@ -71,7 +71,7 @@ public final class DearAppAPI {
     ])
     url = url.appendingPathComponent("lookup")
     let result: SearchResponseDTO = try await performRequest(method: .get, url: url)
-    guard result.resultCount > 0 else { throw DearAppError.noResults }
+    guard result.resultCount > 0 else { throw DearAppsError.noResults }
     let developers: [DeveloperDTO] = result.results.compactMap {
       switch $0 {
       case .application(_): nil
@@ -79,7 +79,7 @@ public final class DearAppAPI {
       }
     }
     guard let developer = developers.first else {
-      throw DearAppError.developerNotFound
+      throw DearAppsError.developerNotFound
     }
     return developer
   }
@@ -96,7 +96,7 @@ public final class DearAppAPI {
       
     ])
     let result: SearchResponseDTO = try await performRequest(method: .get, url: url)
-    guard result.resultCount > 0 else { throw DearAppError.noResults }
+    guard result.resultCount > 0 else { throw DearAppsError.noResults }
     let apps: [ApplicationDTO] = result.results.compactMap {
       switch $0 {
       case .application(let app): app
@@ -116,19 +116,19 @@ public final class DearAppAPI {
         let (data, response) = try await urlSession.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw DearAppError.invalidResponse
+            throw DearAppsError.invalidResponse
         }
         
         guard (200...299).contains(httpResponse.statusCode) else {
-            throw DearAppError.httpError(statusCode: httpResponse.statusCode)
+            throw DearAppsError.httpError(statusCode: httpResponse.statusCode)
         }
 
         let decoder = JSONDecoder()
         return try decoder.decode(T.self, from: data)
     } catch let decodingError as DecodingError {
-        throw DearAppError.decodingError(decodingError)
+        throw DearAppsError.decodingError(decodingError)
     } catch {
-        throw DearAppError.networkError(error)
+        throw DearAppsError.networkError(error)
     }
   }
 }
@@ -141,7 +141,7 @@ enum HTTPMethod: String {
   case patch = "PATCH"
 }
 
-enum DearAppError: Error {
+enum DearAppsError: Error {
   case appNotFound
   case developerNotFound
   case noResults

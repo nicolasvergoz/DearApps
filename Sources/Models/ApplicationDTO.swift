@@ -8,7 +8,7 @@ public struct ApplicationDTO: Codable {
   public let features: [String]?
   public let supportedDevices: [String]?
   public let advisories: [String]?
-  public let kind: String?
+  public let kind: String
   public let artistViewUrl: String?
   public let artworkUrl60: String?
   public let artworkUrl100: String?
@@ -23,13 +23,13 @@ public struct ApplicationDTO: Codable {
   public let genreIds: [String]?
   public let primaryGenreName: String?
   public let primaryGenreId: Int?
-  public let trackId: Int?
+  public let trackId: Int
   public let trackName: String?
   public let sellerName: String?
   public let isVppDeviceBasedLicensingEnabled: Bool?
   public let currentVersionReleaseDate: String?
   public let releaseNotes: String?
-  public let version: String?
+  public let version: String
   public let currency: String?
   public let description: String?
   public let minimumOsVersion: String?
