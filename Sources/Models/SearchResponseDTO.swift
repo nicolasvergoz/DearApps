@@ -1,6 +1,6 @@
-import StickerFoundation
+import Foundation
 
-public struct SearchResponseDTO: Decodable {
+public struct SearchResponseDTO: Decodable, Sendable {
   public let resultCount: Int
   public let results: [SearchResult]
   
@@ -9,7 +9,7 @@ public struct SearchResponseDTO: Decodable {
   }
 }
 
-public enum SearchResult: Decodable {
+public enum SearchResult: Decodable, Sendable {
   case application(ApplicationDTO)
   case developer(DeveloperDTO)
   

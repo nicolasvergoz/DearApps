@@ -1,6 +1,6 @@
 import Foundation
 
-public struct DeveloperDTO: Codable {
+public struct DeveloperDTO: Codable, Sendable {
   public let wrapperType: SearchResultTypeDTO
   public let artistId: Int
   public let artistName: String
