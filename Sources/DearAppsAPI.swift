@@ -1,24 +1,47 @@
 import Foundation
+
 #if canImport(FoundationNetworking)
-import FoundationNetworking
+  import FoundationNetworking
 #endif
 
+/// A client for interacting with the iTunes App Store API.
+/// This client provides methods to fetch information about apps and developers.
+/// Example usage:
+/// ```swift
+/// let api = DearAppsAPI()
+/// let app = try await api.getApp(bundleId: "com.example.app")
+/// ```
 public actor DearAppsAPI {
 
-  private let urlSession: URLSession
-  private let locale: Locale
-  private let baseURL: URL = URL(string: "https://itunes.apple.com")!
+  public enum Constants {
+    public static let baseURL = URL(string: "https://itunes.apple.com")!
+    public static let contentType = "application/json"
+    public static let entitySoftware = "software"
+  }
 
-  public init(urlSession: URLSession = .shared, locale: Locale = .current) {
+  private let urlSession: URLSession
+  private let globalLocale: Locale?
+  private let baseURL: URL
+
+  /// Initialize a new DearAppsAPI client
+  /// - Parameters:
+  ///   - urlSession: The URLSession to use for network requests. Defaults to URLSession.shared
+  ///   - locale: The default locale to use for requests. Defaults to current locale
+  ///   - baseURL: The base URL for the API. Defaults to iTunes API URL
+  public init(
+    urlSession: URLSession = .shared,
+    locale globalLocale: Locale? = .current,
+    baseURL: URL = Constants.baseURL
+  ) {
     self.urlSession = urlSession
-    self.locale = locale
+    self.globalLocale = globalLocale
+    self.baseURL = baseURL
   }
 
   /// Get App Informations by bundleId
-  public func getApp(bundleId: String) async throws -> ApplicationDTO {
+  public func getApp(bundleId: String, locale: Locale? = nil) async throws -> ApplicationDTO {
     var url: URL = baseURL
-    let language = locale.language.languageCode?.identifier.lowercased() ?? "en"
-    if language != "en" { url.appendPathComponent(language) }
+    url.addLanguageToURL(locale: locale ?? self.globalLocale)
     url = url.appendingPathComponent("lookup")
     url.append(queryItems: [
       URLQueryItem(name: "bundleId", value: bundleId)
@@ -38,10 +61,9 @@ public actor DearAppsAPI {
   }
 
   /// Get App Informations by AppStore Id
-  public func getApp(appStoreId: Int) async throws -> ApplicationDTO {
+  public func getApp(appStoreId: Int, locale: Locale? = nil) async throws -> ApplicationDTO {
     var url: URL = baseURL
-    let language = locale.language.languageCode?.identifier.lowercased() ?? "en"
-    if language != "en" { url.appendPathComponent(language) }
+    url.addLanguageToURL(locale: locale ?? self.globalLocale)
     url = url.appendingPathComponent("lookup")
     url.append(queryItems: [
       URLQueryItem(name: "id", value: "\(appStoreId)")
@@ -61,9 +83,14 @@ public actor DearAppsAPI {
   }
 
   /// Get Other Apps of from same Developer by current app's bundleId
-  public func getOtherApps(bundleId: String) async throws -> [ApplicationDTO] {
+  public func getOtherApps(bundleId: String, excludeCurrentId: Bool = false, locale: Locale? = nil) async throws -> [ApplicationDTO] {
     let app = try await getApp(bundleId: bundleId)
-    return try await getApps(developerId: app.artistId)
+    let apps = try await getApps(developerId: app.artistId, locale: locale)
+    if excludeCurrentId {
+      return apps.filter { $0.bundleId != bundleId }
+    } else {
+      return apps
+    }
   }
 
   /// Get Developer Informations
@@ -86,17 +113,15 @@ public actor DearAppsAPI {
     }
     return developer
   }
-  
+
   /// Get Developer's Apps
-  public func getApps(developerId: Int) async throws -> [ApplicationDTO] {
+  public func getApps(developerId: Int, locale: Locale? = nil) async throws -> [ApplicationDTO] {
     var url = baseURL
-    let language = locale.language.languageCode?.identifier.lowercased() ?? "en"
-    if language != "en" { url.appendPathComponent(language) }
+    url.addLanguageToURL(locale: locale ?? self.globalLocale)
     url = url.appendingPathComponent("lookup")
     url.append(queryItems: [
       URLQueryItem(name: "id", value: "\(developerId)"),
-      URLQueryItem(name: "entity", value: "software"),
-      
+      URLQueryItem(name: "entity", value: Constants.entitySoftware),
     ])
     let result: SearchResponseDTO = try await performRequest(method: .get, url: url)
     guard result.resultCount > 0 else { throw DearAppsError.noResults }
@@ -110,28 +135,33 @@ public actor DearAppsAPI {
   }
 
   /// Perform a request
+  /// - Parameters:
+  ///   - method: The HTTP method to use
+  ///   - url: The URL to request
+  /// - Returns: Decoded response of type T
+  /// - Throws: DearAppsError if the request fails
   private func performRequest<T: Decodable>(method: HTTPMethod, url: URL) async throws -> T {
     var request = URLRequest(url: url)
     request.httpMethod = method.rawValue
-    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    request.setValue(Constants.contentType, forHTTPHeaderField: "Content-Type")
 
     do {
-        let (data, response) = try await urlSession.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw DearAppsError.invalidResponse
-        }
-        
-        guard (200...299).contains(httpResponse.statusCode) else {
-            throw DearAppsError.httpError(statusCode: httpResponse.statusCode)
-        }
+      let (data, response) = try await urlSession.data(for: request)
 
-        let decoder = JSONDecoder()
-        return try decoder.decode(T.self, from: data)
+      guard let httpResponse = response as? HTTPURLResponse else {
+        throw DearAppsError.invalidResponse
+      }
+
+      guard (200...299).contains(httpResponse.statusCode) else {
+        throw DearAppsError.httpError(statusCode: httpResponse.statusCode)
+      }
+
+      let decoder = JSONDecoder()
+      return try decoder.decode(T.self, from: data)
     } catch let decodingError as DecodingError {
-        throw DearAppsError.decodingError(decodingError)
+      throw DearAppsError.decodingError(decodingError)
     } catch {
-        throw DearAppsError.networkError(error)
+      throw DearAppsError.networkError(error)
     }
   }
 }
@@ -152,4 +182,14 @@ enum DearAppsError: Error {
   case httpError(statusCode: Int)
   case decodingError(DecodingError)
   case networkError(Error)
+}
+
+extension URL {
+  public mutating func addLanguageToURL(locale: Locale?) {
+    if let locale: Locale,
+      let language: String = locale.language.languageCode?.identifier.lowercased(),
+      language != "en" {
+      self.appendPathComponent(language)
+    }
+  }
 }
