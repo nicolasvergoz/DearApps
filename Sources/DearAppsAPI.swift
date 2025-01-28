@@ -41,7 +41,7 @@ public actor DearAppsAPI {
   /// Get App Informations by bundleId
   public func getApp(bundleId: String, locale: Locale? = nil) async throws -> ApplicationDTO {
     var url: URL = baseURL
-    url.addLanguageToURL(locale: locale ?? self.globalLocale)
+    url.addRegionCodeToURL(locale: locale ?? self.globalLocale)
     url = url.appendingPathComponent("lookup")
     url.append(queryItems: [
       URLQueryItem(name: "bundleId", value: bundleId)
@@ -63,7 +63,7 @@ public actor DearAppsAPI {
   /// Get App Informations by AppStore Id
   public func getApp(appStoreId: Int, locale: Locale? = nil) async throws -> ApplicationDTO {
     var url: URL = baseURL
-    url.addLanguageToURL(locale: locale ?? self.globalLocale)
+    url.addRegionCodeToURL(locale: locale ?? self.globalLocale)
     url = url.appendingPathComponent("lookup")
     url.append(queryItems: [
       URLQueryItem(name: "id", value: "\(appStoreId)")
@@ -117,7 +117,7 @@ public actor DearAppsAPI {
   /// Get Developer's Apps
   public func getApps(developerId: Int, locale: Locale? = nil) async throws -> [ApplicationDTO] {
     var url = baseURL
-    url.addLanguageToURL(locale: locale ?? self.globalLocale)
+    url.addRegionCodeToURL(locale: locale ?? self.globalLocale)
     url = url.appendingPathComponent("lookup")
     url.append(queryItems: [
       URLQueryItem(name: "id", value: "\(developerId)"),
@@ -185,10 +185,9 @@ enum DearAppsError: Error {
 }
 
 extension URL {
-  public mutating func addLanguageToURL(locale: Locale?) {
+  public mutating func addRegionCodeToURL(locale: Locale?) {
     if let locale: Locale,
-      let language: String = locale.language.languageCode?.identifier.lowercased(),
-      language != "en" {
+       let language: String = locale.region?.identifier.lowercased() {
       self.appendPathComponent(language)
     }
   }
